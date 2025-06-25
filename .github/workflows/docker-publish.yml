@@ -1,0 +1,97 @@
+# .github/workflows/build-tun2proxy.yml
+name: Build and Push Docker Image
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 1 * * *'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: true
+
+      - name: Get latest upstream release tag
+        id: upstream
+        run: |
+          TAG=$(curl -s https://api.github.com/repos/tun2proxy/tun2proxy/releases/latest | jq -r .tag_name)
+          echo "latest=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Read last_version.txt
+        id: last
+        run: |
+          if [[ -f last_version.txt ]]; then
+            echo "stored=$(< last_version.txt)" >> $GITHUB_OUTPUT
+          else
+            echo "::notice last_version.txt missing; treating as empty"
+            echo "stored=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Decide if build is needed
+        id: decide
+        run: |
+          # Always build on any push to main
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "::notice Triggered by push; building"
+            echo "needed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # On manual runs, always build
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "needed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # On scheduled runs, only build if upstream tag changed
+          if [[ "${{ steps.upstream.outputs.latest }}" == "${{ steps.last.outputs.stored }}" ]]; then
+            echo "::warning No new upstream release; skipping build"
+            echo "needed=false" >> $GITHUB_OUTPUT
+          else
+            echo "::notice New upstream release detected; building"
+            echo "needed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Log into GHCR
+        if: steps.decide.outputs.needed == 'true'
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build & push image to GHCR
+        if: steps.decide.outputs.needed == 'true'
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/docker-tun2proxy:${{ steps.upstream.outputs.latest }}
+            ghcr.io/${{ github.repository_owner }}/docker-tun2proxy:latest
+
+      - name: Update last_version.txt and push
+        if: steps.decide.outputs.needed == 'true'
+        run: |
+          echo "${{ steps.upstream.outputs.latest }}" > last_version.txt
+          git config user.name  "${{ secrets.GIT_USER_NAME }}"
+          git config user.email "${{ secrets.GIT_USER_EMAIL }}"
+          git add last_version.txt
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: bump tun2proxy to ${{ steps.upstream.outputs.latest }}"
+            git push
+          fi
