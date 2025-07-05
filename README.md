@@ -37,12 +37,12 @@ A minimal Alpine-based Docker image that installs the latest `tun2proxy` binary 
 docker run -d \
   --name customtun2proxy \                             # Name your container for easy reference
   --cap-add=NET_ADMIN \                                # Adds administrative networking capabilities (needed for TUN device)
-  -e TARGETDNS=76.76.2.3 \                             # Set the target DNS server environment variable
+  -e TARGETDNS=1.1.1.1 \                             # Set the target DNS server environment variable
   -v /dev/net/tun:/dev/net/tun \                       # Mount the host TUN device into the container
   ghcr.io/techroy23/docker-tun2proxy:latest \          # Use the built Docker image
   --proxy socks5://username:password@x.x.x.x:xxxxx \   # Configure the upstream SOCKS5 proxy
   --dns over-tcp \                                     # Force DNS resolution to use TCP (reduces potential for DNS leaks)
-  --dns-addr 76.76.2.3                                 # Explicitly define DNS server to use
+  --dns-addr 1.1.1.1                                 # Explicitly define DNS server to use
 
 # Tip: For better privacy and reliability, consider setting up your **own DNS resolver** (e.g., Unbound or CoreDNS)
 # and point `TARGETDNS` and `--dns-addr` to that instead of using public resolvers.
