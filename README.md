@@ -16,8 +16,6 @@ A minimal Alpine-based Docker image that installs the latest `tun2proxy` binary 
 
 - Alpine Linux base for minimal footprint. 
 - Auto-fetches and installs the latest `tun2proxy` release from GitHub  
-- Intercepts DNS requests to common public resolvers (1.1.1.1, 8.8.8.8, etc.)  
-- Redirects intercepted DNS to your specified `TARGETDNS` via `iptables` DNAT  
 - Launches `tun2proxy` in the foreground as PID 1  
 
 ---
@@ -35,18 +33,13 @@ A minimal Alpine-based Docker image that installs the latest `tun2proxy` binary 
 
 ```bash
 docker run -d \
-  --name customtun2proxy \                             # Name your container for easy reference
+  --name tun2proxy \                                   # Name your container for easy reference
   --cap-add=NET_ADMIN \                                # Adds administrative networking capabilities (needed for TUN device)
-  -e TARGETDNS=1.1.1.1 \                             # Set the target DNS server environment variable
   -v /dev/net/tun:/dev/net/tun \                       # Mount the host TUN device into the container
   ghcr.io/techroy23/docker-tun2proxy:latest \          # Use the built Docker image
   --proxy socks5://username:password@x.x.x.x:xxxxx \   # Configure the upstream SOCKS5 proxy
   --dns over-tcp \                                     # Force DNS resolution to use TCP (reduces potential for DNS leaks)
-  --dns-addr 1.1.1.1                                 # Explicitly define DNS server to use
-
-# Tip: For better privacy and reliability, consider setting up your **own DNS resolver** (e.g., Unbound or CoreDNS)
-# and point `TARGETDNS` and `--dns-addr` to that instead of using public resolvers.
-# This avoids data leakage and gives you more control.
+  --dns-addr 1.1.1.1                                   # Explicitly define DNS server to use
 ```
 
 ---
